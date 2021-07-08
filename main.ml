@@ -28,36 +28,39 @@ end
 
 module TreeGraph = struct
       type index = int
-      type t = Node of index * t list
+      type t =
+            | End
+            | Node of index * t * t
 
-      let empty = Node (-2, [])
+      let empty = Node (-1, End, End)
 
-      let rec has_key key (Node (parent, children)) =
-            if key = parent
-            then true
-            else List.exists (has_key key) children
+      let rec has_key search_key = function 
+            | End -> false
+            | Node(key, inner, next) ->
+                  if key = search_key
+                  then true
+                  else has_key key inner || has_key key next
 
       let rec add parent child = function
-            | Node (key, children) when key = parent -> Node (key, Node(child, []) :: children) 
-            | Node (key, children) ->
-                  if List.exists (has_key key) children
-                  then Node (key, List.map (add parent child) children)
-                  else Node (key, Node(parent, [Node(child, [])]) :: children)
-end
+            | End -> Node (parent, Node(child, End, End), End)
 
-let rec tree_of_flat tree = function
-      | FlatGraph.End -> tree
-      | FlatGraph.Node(parent, children, next) -> 
-            let sub_tree =
-                  children
-                  |> List.fold_left (fun acc child -> TreeGraph.(add parent child acc)) tree
-            in
-            tree_of_flat sub_tree next
+            | Node (key, inner, next) when key = parent ->
+                  Node (key, Node(child, inner, End), next) 
+
+            | Node (key, inner, next) ->
+                  if has_key parent inner
+                  then Node (key, (add parent child inner), next)
+                  else Node (key, inner, (add parent child next))
+end
 
 let int_of_pos (x, y) =
       if x < 0 || x > 5 || y < 0 || y > 5
       then -1
       else x + y * 6
+
+let pos_of_int = function
+      | -1 -> (-1, -1)
+      | num -> (num mod 6, num / 6)
 
 type value =
       | Outer
@@ -75,7 +78,7 @@ let value_of_pos (x, y) =
             | Failure _ -> Outer
             | Invalid_argument _ -> Outer
 
-let test =
+let flat_relation_graph =
       let xs = List.init (7 * 7) (fun x -> x mod 7) in
       let ys = List.init (7 * 7) (fun x -> x / 7) in
 
@@ -84,20 +87,34 @@ let test =
             let curr_pos = (x, y) in
             let upper_pos = (x, y-1) in
 
-            print_endline @@ Printf.sprintf "(%d, %d)" x y;
-
-            let tuple_of_points pos_a pos_b =
+            let tuple_of_points pos_a pos_b graph =
                   match value_of_pos pos_a, value_of_pos pos_b with
                   | (Outer, Black)
-                  | (Black, Black) -> [(int_of_pos pos_a, int_of_pos pos_b)]
-                  | (Black, Outer) -> [(int_of_pos pos_b, int_of_pos pos_a)]
-                  | _ -> []
+                  | (Black, Black) -> FlatGraph.add (int_of_pos pos_a) (int_of_pos pos_b) graph
+                  | (Black, Outer) -> FlatGraph.add (int_of_pos pos_b) (int_of_pos pos_a) graph
+                  | _ -> graph
             in
             acc
-            @ tuple_of_points left_pos curr_pos
-            @ tuple_of_points curr_pos upper_pos
-      ) [] xs ys
+            |> tuple_of_points left_pos curr_pos
+            |> tuple_of_points curr_pos upper_pos
+      ) FlatGraph.empty xs ys
 
+let rec tree_of_flat tree = function
+      | FlatGraph.End -> tree
+      | FlatGraph.Node(parent, children, next) -> 
+            let sub_tree =
+                  children
+                  |> List.fold_left (fun acc child -> TreeGraph.(add parent child acc)) tree
+            in
+            tree_of_flat sub_tree next
 
-(* list of all coords *)
+let tree_relation_graph = tree_of_flat TreeGraph.empty flat_relation_graph
+
+(*
+let rec ger_result input = function
+      | TreeGraph.End -> input
+      | TreeGraph.Node (key, inner, next) ->
+*)
+
+(* convert tree graph to board OR override input board *)
 
