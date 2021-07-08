@@ -7,6 +7,13 @@ let input = [
       [1; 0; 0; 0; 0; 1];
 ]
 
+let add_unique lst value =
+      if List.mem value lst
+      then lst
+      else value :: lst
+
+let merge_lists = List.fold_left add_unique
+
 module FlatGraph = struct
       type index = int
 
@@ -14,52 +21,37 @@ module FlatGraph = struct
             | End
             | Node of index * index list * t
 
-      let empty = Node (-1, [], End)
+      let root = 999
+
+      let empty = Node (1, [root], End)
 
       let rec add parent child = function
             | End -> Node (parent, [child], End)
             | Node (value, children, next) -> (
                   match value - parent with
-                  | 0 -> Node (value, child :: children, next)
-                  | diff when diff < 0 -> Node (value, children, add parent child next)
+                  | 0 -> Node (value, add_unique children child, next)
+                  | diff when diff > 0 -> Node (value, children, add parent child next)
                   | _ -> Node (parent, [child], Node(value, children, next))
             )
-end
 
-module TreeGraph = struct
-      type index = int
-      type t =
-            | End
-            | Node of index * t * t
-
-      let empty = Node (-1, End, End)
-
-      let rec has_key search_key = function 
-            | End -> false
-            | Node(key, inner, next) ->
-                  if key = search_key
-                  then true
-                  else has_key key inner || has_key key next
-
-      let rec add parent child = function
-            | End -> Node (parent, Node(child, End, End), End)
-
-            | Node (key, inner, next) when key = parent ->
-                  Node (key, Node(child, inner, End), next) 
-
-            | Node (key, inner, next) ->
-                  if has_key parent inner
-                  then Node (key, (add parent child inner), next)
-                  else Node (key, inner, (add parent child next))
+      let rec list_of_graph acc = function
+            | End -> acc
+            | Node (value, children, next) ->
+                  let acc =
+                        if List.mem value acc
+                        then merge_lists List.(sort (fun a b -> b - a) children) acc
+                        else acc
+                  in
+                  list_of_graph acc next
 end
 
 let int_of_pos (x, y) =
       if x < 0 || x > 5 || y < 0 || y > 5
-      then -1
+      then FlatGraph.root
       else x + y * 6
 
 let pos_of_int = function
-      | -1 -> (-1, -1)
+      | num when num = FlatGraph.root -> FlatGraph.(root, root)
       | num -> (num mod 6, num / 6)
 
 type value =
@@ -99,16 +91,19 @@ let flat_relation_graph =
             |> tuple_of_points curr_pos upper_pos
       ) FlatGraph.empty xs ys
 
-let rec tree_of_flat tree = function
-      | FlatGraph.End -> tree
-      | FlatGraph.Node(parent, children, next) -> 
-            let sub_tree =
-                  children
-                  |> List.fold_left (fun acc child -> TreeGraph.(add parent child acc)) tree
-            in
-            tree_of_flat sub_tree next
+let res_list = FlatGraph.list_of_graph [FlatGraph.root] flat_relation_graph
 
-let tree_relation_graph = tree_of_flat TreeGraph.empty flat_relation_graph
+let result = 
+      let (<&&>) = List.init in
+      6 <&&> fun x ->
+      6 <&&> fun y ->
+            let result_value = function
+                  | int_pos when List.mem int_pos res_list -> 1
+                  | _ -> 0
+            in
+            (x, y)
+            |> int_of_pos
+            |> result_value
 
 (*
 let rec ger_result input = function
