@@ -1,3 +1,5 @@
+(* https://www.youtube.com/watch?v=4tYoVx0QoN0&t=201s *)
+
 let input = [
       [1; 0; 0; 0; 0; 0];
       [0; 1; 0; 1; 1; 1];
@@ -52,7 +54,7 @@ module Pos = struct
       let left (x, y) = (x - 1, y)
       let top (x, y) = (x, y - 1)
 
-      let t_of_pos (x, y) =
+      let t_of_pos input (x, y) =
             try
                   let row = List.nth input y in
                   match List.nth row x with
@@ -63,9 +65,10 @@ module Pos = struct
                   | _ -> Outer
 end
 
-let connections_graph =
+let connections_graph input =
       let xs = List.init (size_ * size_) (fun index -> index mod size_) in
       let ys = List.init (size_ * size_) (fun index -> index / size_) in
+      let t_of_pos = Pos.t_of_pos input in
       
       List.fold_left2 (fun graph x y ->
             let cur = (x, y) in
@@ -74,7 +77,7 @@ let connections_graph =
 
             let _ = cur |> Pos.int_of_pos |> string_of_int |> print_endline in
 
-            let conn a b = match Pos.(t_of_pos a, t_of_pos b) with
+            let conn a b = match (t_of_pos a, t_of_pos b) with
                   | (Outer, Black) -> ListGraph.add Pos.(int_of_pos a, int_of_pos b) []
                   | (Black, Black)
                   | (Black, Outer) -> ListGraph.add Pos.(int_of_pos b, int_of_pos a) []
@@ -86,7 +89,7 @@ let connections_graph =
 
       ) ListGraph.empty xs ys
 
-let last_connections = ListGraph.last_items connections_graph
+let last_connections = ListGraph.last_items @@ connections_graph input
 
 let result =
       List.init size (fun y ->
